@@ -1,0 +1,23 @@
+﻿<Application x:Class="WpfBehaviours.Shell.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+
+
+                <ResourceDictionary Source="pack://application:,,,/WpfBehaviours.ControlSet;component/Assets/ModernUI.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/WpfBehaviours.ControlSet;component/Assets/ModernUI.Light.xaml"/>
+                <ResourceDictionary Source="/Resources/ModernUI.LightThemeCustomization.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/WpfBehaviours.Modules.Dealing;component/Resources/DealingModuleResources.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/WpfBehaviours.Infrastructure;component/Resources/InfrastructureRersources.xaml" />
+
+                <!-- Get around a bug in .NET 4.0 : http://wpftutorial.net/MergedDictionaryPerformance.html -->
+                <ResourceDictionary>
+                    <Style TargetType="{x:Type Rectangle}" />
+                </ResourceDictionary>
+
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,10 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Color x:Key="AccentColor" >#ff0074C1</Color>
+    <SolidColorBrush x:Key="AccentBrush" >#ff0074C1</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentBrushAlpha"  Color="#7F0074C1" ></SolidColorBrush>
+    <SolidColorBrush x:Key="ErrorBrush" Color="#FFD70000" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="LimeGreen" />
+    <SolidColorBrush x:Key="StandardBorderBrush" Color="#FFB9B9B9" />
+    <SolidColorBrush x:Key="StandardDisabledBrush" Color="#FFB9B9B9" />
+</ResourceDictionary>

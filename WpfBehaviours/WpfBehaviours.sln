@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{70AF424E-BFE7-4812-A00D-C5F6F3C89826}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfBehaviours.Shell", "WpfBehaviours.Shell\WpfBehaviours.Shell.csproj", "{E145042D-7C2A-4AD4-B405-C9CBC04CE0A2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfBehaviours.Infrastructure", "WpfBehaviours.Infrastructure\WpfBehaviours.Infrastructure.csproj", "{E92E5C8C-8268-4B9D-8803-ACAB7E5EBD6E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfBehaviours.Modules.Dealing", "WpfBehaviours.Modules.Dealing\WpfBehaviours.Modules.Dealing.csproj", "{5381F12E-2D06-45D9-8A00-B0B67C48AD23}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WpfBehaviours.ControlSet", "WpfBehaviours.ControlSet\WpfBehaviours.ControlSet.csproj", "{44A608E1-C649-43A1-BD65-4EE164622534}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E145042D-7C2A-4AD4-B405-C9CBC04CE0A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E145042D-7C2A-4AD4-B405-C9CBC04CE0A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E145042D-7C2A-4AD4-B405-C9CBC04CE0A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E145042D-7C2A-4AD4-B405-C9CBC04CE0A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E92E5C8C-8268-4B9D-8803-ACAB7E5EBD6E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E92E5C8C-8268-4B9D-8803-ACAB7E5EBD6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E92E5C8C-8268-4B9D-8803-ACAB7E5EBD6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E92E5C8C-8268-4B9D-8803-ACAB7E5EBD6E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5381F12E-2D06-45D9-8A00-B0B67C48AD23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5381F12E-2D06-45D9-8A00-B0B67C48AD23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5381F12E-2D06-45D9-8A00-B0B67C48AD23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5381F12E-2D06-45D9-8A00-B0B67C48AD23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44A608E1-C649-43A1-BD65-4EE164622534}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44A608E1-C649-43A1-BD65-4EE164622534}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44A608E1-C649-43A1-BD65-4EE164622534}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44A608E1-C649-43A1-BD65-4EE164622534}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		EnterpriseLibraryConfigurationToolBinariesPath = packages\Unity.2.1.505.0\lib\NET35
+	EndGlobalSection
+EndGlobal

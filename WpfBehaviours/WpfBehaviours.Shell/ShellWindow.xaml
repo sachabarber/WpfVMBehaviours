@@ -1,0 +1,70 @@
+﻿<Window x:Class="WpfBehaviours.Shell.ShellWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:prism="http://www.codeplex.com/CompositeWPF"
+        xmlns:regions="clr-namespace:WpfBehaviours.Infrastructure.Regions;assembly=WpfBehaviours.Infrastructure"
+        xmlns:attachedProps="clr-namespace:WpfBehaviours.Infrastructure.AttachedProps;assembly=WpfBehaviours.Infrastructure"
+        xmlns:utils="clr-namespace:WpfBehaviours.Modules.Dealing.Utils;assembly=WpfBehaviours.Modules.Dealing"
+        Title="{Binding Title}" 
+        Icon="cog.ico"
+        MinWidth="800" MinHeight="600" WindowState="Normal" 
+        TextElement.FontFamily="Segoe UI">
+    
+    
+    <Window.Resources>
+        <Style x:Key="canvContainerStyle" TargetType="{x:Type ContentPresenter}">
+            <Setter Property="Canvas.Left" Value="{Binding Left, Mode=TwoWay}"/>
+            <Setter Property="Canvas.Top" Value="{Binding Top, Mode=TwoWay}"/>
+            <Setter Property="Canvas.ZIndex" Value="{Binding ZIndex, Mode=TwoWay}"/>
+            <Setter Property="utils:DraggableExtender.CanDrag" Value="True" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Canvas.ZIndex" Value="99999"></Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+
+    <Grid attachedProps:GridUtils.ColumnDefinitions="*"
+                attachedProps:GridUtils.RowDefinitions="60, *,110">
+
+
+
+        <StackPanel Orientation="Horizontal" Margin="10" Grid.Row="0">
+
+            <!-- Spot Button-->
+            <Button Style="{DynamicResource accentHightlightColorImageButtonFieldStyle}"  
+                                        Command="{Binding ShowSpotTileCommand}" 
+                                        ToolTip="Spot Tile" >
+                <Viewbox>
+                    <Grid>
+                        <Grid Width="40" Height="40" >
+                            <Rectangle Fill="{Binding RelativeSource={RelativeSource AncestorType={x:Type Button} }, Path=Background}" />
+                        </Grid>
+
+                        <Path Data="M31.647835,21.819011C37.056774,21.819011 41.4459,26.202763 41.4459,31.610512 41.4459,37.017222 37.056774,41.402012 31.647835,41.402012 26.239018,41.402012 21.859899,37.017222 21.859899,31.610512 21.859899,26.202763 26.239018,21.819011 31.647835,21.819011z M31.648463,11.80599C20.728994,11.80599 11.839426,20.691982 11.839426,31.610973 11.839426,42.532965 20.728994,51.417955 31.648463,51.417955 42.567934,51.417955 51.457502,42.532965 51.457502,31.610973 51.457502,20.691982 42.567934,11.80599 31.648463,11.80599z M29.86855,0L32.798408,0 32.798408,10.187991C43.367895,10.74999,51.90748,18.918984,53.007425,29.330975L53.007425,29.305974 62.666958,29.305974 62.666958,32.240973 53.127401,32.240973 53.130848,32.147326C53.135221,31.969078 53.137421,31.790286 53.137421,31.610973 53.137421,31.822973 53.12742,32.030972 53.11742,32.240973L53.127401,32.240973 53.111229,32.680408C52.572058,43.662609,43.773811,52.452738,32.798408,53.034954L32.798408,62.666946 29.86855,62.666946 29.86855,53.119955C30.07854,53.125956 30.288529,53.129955 30.49852,53.129955 30.798505,53.129955 31.098491,53.093954 31.398476,53.080956 20.016216,52.949205 10.764194,43.978889 10.197059,32.708606L10.17942,32.240973 10.175706,32.104497 10.169507,31.610973C10.169507,31.716973,10.169507,31.821973,10.170757,31.926723L10.175706,32.104497 10.176422,32.161503 10.17942,32.240973 0,32.240973 0,29.305974 10.289501,29.305974C11.379448,18.857984 20.049027,10.63199 30.728508,10.176991 30.648512,10.174992 30.578516,10.163991 30.49852,10.163991 30.288529,10.163991 30.07854,10.166991 29.86855,10.174992z" 
+                                                            Stretch="Uniform" Fill="{Binding RelativeSource={RelativeSource AncestorType={x:Type Button} }, Path=Foreground}" Width="20" Height="20" />
+                    </Grid>
+                </Viewbox>
+            </Button>
+
+
+
+
+        </StackPanel>
+
+        <ItemsControl Grid.Row="1" ItemContainerStyle="{StaticResource canvContainerStyle}"
+            prism:RegionManager.RegionName="{x:Static regions:RegionNames.MainRegion}" Background="LightGray">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Canvas ClipToBounds="True"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+        </ItemsControl>
+
+
+        <DataGrid ItemsSource="{Binding SpotTrades}" Grid.Row="2" Visibility="Visible"/>
+
+    </Grid>
+</Window>
