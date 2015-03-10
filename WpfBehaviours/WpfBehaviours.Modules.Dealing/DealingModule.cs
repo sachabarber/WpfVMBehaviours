@@ -62,8 +62,6 @@ namespace WpfBehaviours.Modules.Dealing
                 var uri = new Uri(typeof(SpotTileViewModel).FullName + parameters, UriKind.RelativeOrAbsolute);
                 regionManager.RequestNavigateUsingSpecificContainer(RegionNames.MainRegion, uri,
                     regionNavigationCallbackHelper.HandleNavigationCallback, childContainer);
-
-
             }
         }
 

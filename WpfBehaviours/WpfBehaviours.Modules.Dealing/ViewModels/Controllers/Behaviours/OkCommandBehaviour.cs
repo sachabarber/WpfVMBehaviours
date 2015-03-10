@@ -50,8 +50,6 @@ namespace WpfBehaviours.Modules.Dealing.ViewModels.Controllers.Behaviours
                         spotTileViewModel.RateViewModel.WholeRate,
                         DateTime.Now));
                 }));
-             
         }
-
     }
 }

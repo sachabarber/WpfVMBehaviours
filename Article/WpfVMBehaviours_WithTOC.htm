@@ -1,0 +1,1466 @@
+
+<ul>
+<li><a href="#Introduction">Introduction</a></li>
+
+<li><a href="#Demo-Video">Demo Video</a></li>
+
+<li><a href="#ScreenShot-">ScreenShot </a></li>
+
+<li><a href="#Prerequisites">Prerequisites</a></li>
+
+<li><a href="#Where-Is-The-Code?">Where Is The Code?</a></li>
+
+<li><a href="#A-Note-About-Navigation-(The-Mule)">A Note About Navigation (The Mule)</a></li>
+
+<li><a href="#The-Good-Stuff">The Good Stuff</a>
+<ul>
+<li><a href="#The-General-Idea">The General Idea</a></li>
+
+<li><a href="#A-Deeper-Dive-Into-The-Guts-Of-It">A Deeper Dive Into The Guts Of It</a>
+<ul>
+<li><a href="#Thinking-In-Composable-Views">Thinking In Composable Views</a></li>
+
+<li><a href="#Disposable-ViewModels-/-Child-Container-Lifecycle-Management">Disposable ViewModels / Child Container Lifecycle Management</a>
+<ul>
+<li><a href="#Disposable-ViewModel">Disposable ViewModel</a></li>
+
+
+<li><a href="#Adding-The-Child-IOC-Container-To-ViewModel-As-IDisposable">Adding The Child IOC Container To ViewModel As IDisposable</a></li>
+
+</ul>
+
+<li><a href="#ViewModel-Navigation-/-Child-Containers">ViewModel Navigation / Child Containers</a>
+<ul>
+<li><a href="#Cleaning-Up-The-IOC-Services-For-The-Navigation-Request">Cleaning Up The IOC Services For The Navigation Request</a></li>
+
+</ul>
+
+<li><a href="#The-ViewModel-Controller-And-The-Case-Of-The-&quot;ViewModel-Behaviours&quot;">The ViewModel Controller And The Case Of The &quot;ViewModel Behaviours&quot;</a>
+<ul>
+<li><a href="#ViewModel/Controller-Relationship">ViewModel/Controller Relationship</a></li>
+
+<li><a href="#ViewModel-Behaviours">ViewModel Behaviours</a></li>
+
+</ul>
+
+<li><a href="#Reactive-Commands">Reactive Commands</a></li>
+
+<li><a href="#Further-Case-For-RX">Further Case For RX</a></li>
+
+<li><a href="#Typical-VM-Behaviour-Code">Typical VM Behaviour Code</a></li>
+
+</ul>
+
+</ul>
+
+<li><a href="#That's-It">That's It</a></li>
+
+</ul>
+
+
+
+
+<h1><a name="Introduction" id="Introduction">Introduction</a></h1>
+<p>It has been a while since I have written an article, I have had this one on 
+my back burner list for a while, so I thought it high time that I get it out 
+there. In some ways this article is a strange one, as 1/2 of it is kind of throw 
+away, and merely serves as a vehicle to demonstrate the parts that I actually do 
+think are very useful and can be applied to a whole range of different 
+application styles/platforms.</p>
+<p>&nbsp;</p>
+<p><strong>So what is this article about exactly?</strong></p>
+<p>Quite simply it is about how to structure large codebases. I am not claiming 
+that there are not other ways, rather I am claiming this is certainly one way 
+that I personally have found to be incredibly useful. To give you an idea of my 
+current code base I am using MVVM/WPF and have around 1500 ViewModels, my UI 
+codebase alone is around 150,000 lines of code.</p>
+<p>This is not the 1st WPF/MVVM application I have written, but when I look at 
+my current code base compared to older codebases that I worked on, I do get a 
+warm feeling in the knowledge that my new codebase is way more maintainable and 
+testable.</p>
+<p>&nbsp;</p>
+<p><strong>How has this come about</strong></p>
+<p>Well as I say in my (and others) older code bases people were still finding 
+their way with MVVM (which was a new pattern at the time, or at the very least a 
+rebranded one), and composition of ViewModels etc etc Essentially it was 
+unfamiliar ground. Ok there were certain tools that 
+helped with this, one such tool was the now famous <code>DelegateCommand </code>
+(or Josh Smiths <code>RelayCommand</code>) which allowed you to run <code>
+ICommand </code>implementation code directly in your ViewModel. So that helped, 
+and soon everyone was happily creating loads of <code>DelegateCommand</code>(s) 
+in their ViewModels. Some clever folk actually went the extra mile and 
+implemented the Command Pattern properly, but most didn't, and just had loads of
+<code>DelegateCommand</code>(s) in their ViewModel(s). Nothing wrong with that, 
+until.....</p>
+<p>&nbsp;</p>
+<p>You realise you ViewModel is now getting very large due to the sheer number 
+of properties it has to expose, and also the number of <code>DelegateCommand</code>(s) 
+it must accomodate. Each of these <code>DelegateCommand</code>(s) may call out 
+to additional services such as WCF Proxies, Http services etc etc, and the <code>
+DelegateCommand </code>logic may also deal with retries and showing errors to 
+the user, so its not difficult to imagine that one <code>
+DelegateCommand.Execute() </code>method could end up with between 30-100 lines, 
+multiply that by the number of <code>DelegateCommand</code>(s) in your ViewModel 
+and you can quite easily see how out of hand this can get.</p>
+<p>Before long I realised this was not a good idea, and I started create more 
+modular ViewModels. That helped for a while., but then that started to fall 
+apart on occasion, where I realised there were scenarios where the logical split between 
+ViewModels still ended up in situations where that there was still a big 
+ViewModel, and I could not see a way out of that. I caved in, the occassion big 
+ViewModel sigh, ok.</p>
+<p>&nbsp;</p>
+<p>Around the same time I took a new job working at a tier 1 bank and met some 
+very smart developers called</p>
+<ul>
+	<li><strong>Ray Booysen</strong></li>
+	<li><strong>Keith Woods</strong></li>
+</ul>
+<p>&nbsp;</p>
+<p>These guys were making heavy use of the Reactive Extensions (RX), which was 
+fairly new to me at the time, and also talked quite often about VM Behaviours. 
+At the time I did not fully understand what Ray/Keith were talking about, but 
+after I left that job, I had a good old think about the problem, and was like 
+aha I get it now.</p>
+<p>&nbsp;</p>
+<p>What Ray/Keith were talking about was creating small bits of 
+isolated functionality that did one thing and one thing only (Yes our old friend 
+Seperation Of Concern <strong>SOC</strong>), and kind of associating 
+that bit of functionality with a ViewModel instance. The way I like to think of 
+this is &quot;<strong>Attached Behaviours For ViewModels</strong>&quot;. This was achieved using a number 
+of techniques such as </p>
+<ul>
+	<li>Child IOC containers</li>
+	<li>RX</li>
+	<li>Specific IOC services to manage the ViewModel</li>
+</ul>
+<p>&nbsp;</p>
+<p>The rest of this article will talk about my journey into this brighter world 
+(that's a tongue in cheek joke by the way). This technique may not be for 
+everyone, some may even suggest that it breaks the &quot;Law Of Demeter&quot; which I 
+personally think should be renamed &quot;The Occassionally Useful Law Of Demeter&quot;.</p>
+<p>&nbsp;</p>
+<p>Anyway lets get on with the article shall we.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+<h1><a name="Demo-Video" id="Demo-Video">Demo Video</a></h1>
+<p>I have posted a small YouTube video of the demo app in action. You can see 
+that video by clicking on the link below:</p>
+<p><a href="https://www.youtube.com/watch?v=d6rOiiXRZyY" target="_blank">
+https://www.youtube.com/watch?v=d6rOiiXRZyY</a></p>
+<p>&nbsp;</p>
+<h1><a name="ScreenShot-" id="ScreenShot-">ScreenShot </a></h1>
+<p>Here is a screen shot as well</p>
+<p><a href="DemoBig.png" target="_blank"><img alt="" height="354" src="DemoSmall.png" width="630"></a></p>
+<p>&nbsp;</p>
+<p><em>CLICK THE IMAGE TO SEE A BIGGER VERSION</em></p>
+<p>&nbsp;</p>
+<h1><a name="Prerequisites" id="Prerequisites">Prerequisites</a></h1>
+<p>The demo code is made using VS2013, and .NET 4.5, as such you will need 
+both of those to run the demo app correctly.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+
+<h1><a name="Where-Is-The-Code?" id="Where-Is-The-Code?">Where Is The Code?</a></h1>
+<p>The code for this article is available on my GitHub account :</p>
+<p>
+<a href="https://github.com/sachabarber/WpfVMBehaviourshttps://github.com/sachabarber/WpfVMBehaviours">
+https://github.com/sachabarber/WpfVMBehaviours</a></p>
+<p>&nbsp;</p>
+<p>Don't forget if you like the rest of this article, and the ideas herein you 
+can always Star the GitHub repository ;-)</p>
+<p>&nbsp;</p>
+<h3><a name="How-To-Run-The-Code" id="How-To-Run-The-Code">How To Run The Code</a></h3>
+<p>Once/if you download the code, you will need to run it. This is pretty reasy 
+just ensure that the following project is set to be the startup project in the 
+Visual Studio IDE&nbsp;</p>
+<ul>
+	<li><code>WpfBehaviours.Shell</code></li>
+</ul>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+
+<h1><a name="A-Note-About-Navigation-(The-Mule)" id="A-Note-About-Navigation-(The-Mule)">A Note About Navigation (The Mule)</a></h1>
+<p>&nbsp;</p>
+<p>I am entitled this section &quot;The Mule&quot; as it is really not that important, it 
+is a vehicle to allow the demonstration of the rest of the article. That is not 
+to say Mules are useless, they are infact very useful and there may be some&nbsp; 
+amongst you who after reading this, may actually like how I packed &quot;The Mules 
+(AKA
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a>)&quot; 
+saddle bags, and want to take him for your own ride.</p>
+<p>&nbsp;</p>
+<p>For this demo app I am using
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a> for 
+the navigation functionality ONLY, as I think&nbsp;
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a> does 
+offer an excellent navigation framework for WPF/Silverlight/Windows Phones apps. 
+I am of course aware there is a newer version available, but I had some code 
+lying about that I could make use of that targeted
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a> and 
+the newer version of PRISM is different enough that I would have to redo this 
+work. As I say in this article its all about other stuff the Navigation is a 
+nice to have, that I just happened to be able to provide easily by using
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a>.</p>
+<p>&nbsp;</p>
+<p>The truth is you could apply the techniques I am talking about in this to any 
+Windows platform that you can work with that supports IOC containers and RX. You 
+could even apply this to a Windows Forms application where you might use the 
+Model-View-Presenter pattern.</p>
+<p>I guess what I am really saying is that there is quite a bit of custom
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a> region stuff 
+that has been written to make
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a> be 
+able to navigate using a child IOC container in the attached demo article, but you should <span style="background:yellow; border:1px black solid">NOT pay too much 
+attention to that, as that is NOT really what the article is about</span></p>
+<p>&nbsp;</p>
+
+
+<p>If you are interested in how I achieved that you can read a completely 
+separate article I wrote about this some time ago:</p>
+<p>
+<a href="http://www.codeproject.com/Articles/640573/ViewModel-st-Child-Container-PRISM-Navigation" target="_blank">
+http://www.codeproject.com/Articles/640573/ViewModel-st-Child-Container-PRISM-Navigation</a></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+
+<h1><a name="The-Good-Stuff" id="The-Good-Stuff">The Good Stuff</a></h1>
+<p>From here on in is what I consider to be the good/useful stuff in this 
+article that could be applied to other project types, such as :</p>
+<ul>
+	<li>WPF Applications</li>
+	<li>Windows Store Applications</li>
+	<li>Silverlight Applications</li>
+	<li>Windows Phone Applications</li>
+	<li>Universal Applications</li>
+</ul>
+<p>&nbsp;</p>
+<h2><a name="The-General-Idea" id="The-General-Idea">The General Idea</a></h2>
+<p>The general idea behind this architecture is that you may know in advance 
+that you are going to have some pretty knarly UI requirements. I for example 
+work creating trading apps, and regularly have requirements that involve UIs 
+that have cross dependencies between many interconnected ViewModels. Where there 
+may be relationships to parent ViewModels, or possibly even grand parent 
+ViewModels, or between siblings. It can be be a nightmare, imagine all those
+<code>INotifyPropertyChanged </code>event(s) that you will need to not only 
+monitor, but also unhook at the correct time. Argghhh</p>
+<p>Now trying to shoe horn this into a single ViewModel is just not going to 
+work. Thing is we live in modern times, and can make use of modern tooling, 
+which for me includes things like RX/IOC Containers. These are certainly 2 heavy 
+hitters in the implemention of the demo app/framework I am presenting here.</p>
+<p>If this all sounds quite vague don't worry you will see lots of code, we are 
+just setting the scene for it.</p>
+<p>&nbsp;</p>
+<p>So what is the basic idea, well before we get to that, it helps to kind of 
+think about our UI a bit more. Like I say I work creating trading apps, where I 
+have typically have <strong>closeable</strong> Tabs/Tiles of the same type of 
+ViewModel I must show over and over again (different instances of course). So it 
+kind of makes sense for the creation of that ViewModel and its dependencies to 
+be isolated from the creation of another instance of the same type of ViewModel.</p>
+<p>Now, you may have come across lots of Inversion Of Control (IOC) examples 
+about how to inject services into ViewModel instances. Thing is you never really 
+see that many that deal with actual IOC component lifecyles and how that works 
+within your app.</p>
+<p>&nbsp;</p>
+<ul>
+	<li>Imagine you has a shared service, but you wanted it to only be a 
+	singleton to a certain type of ViewModel. Mmmm.&nbsp;</li>
+	<li>And also how would the IOC container know when to release things? Mmmm</li>
+	<li>Or you want each tile to get a singleton instance scoped to it alone. 
+	Mmmm</li>
+</ul>
+<p>&nbsp;</p>
+<p>I have pondered this a lot, and IOC resolved dependencies and having a highly 
+composable UI are things that interest/concern me. And that is what this article 
+is really about.</p>
+<p>So some bullet points</p>
+<p>&nbsp;</p>
+<ul>
+	<li>We will assume that for each new part (view) that is being navigated to, 
+	that we will use a Child IOC Container</li>
+	<li>We will couple (Strongly) the newly created IOC container the the 
+	lifecycle of the ViewModel such that when the ViewModel is closed (no longer 
+	needed) the child container and all the held dependencies it created for the 
+	current ViewModel will be Disposed</li>
+	<li>We will create a set of ViewModel behaviours (some of you may have seen 
+	MVVM + Controller, so you can think of ViewModel Behaviours as Micro 
+	Controllers for the ViewModel instance). The beauty of these &quot;Micro 
+	controllers&quot; is that you can VERY easily find where some code is that does a 
+	certain action, and you will know it will not impact anything else as is is 
+	also following the <strong>Separation Of Concerns</strong> ideals.</li>
+	<li>The ViewModel behaviours will be applied with nothing more than a single 
+	IOC registration</li>
+	<li>The ViewModel behaviours will be able to monitor the ViewModel using RX 
+	(this is awesome the more I use it the more I love it)</li>
+</ul>
+<p>&nbsp;</p>
+<p>Some of you may baulk at the &quot;Airy Fairyness&quot; of this, and yeah fair enough, 
+but I honestly am telling you by following this pattern I feel I have finally 
+found my XAML nirvana/sweet spot.</p>
+<p>&nbsp;</p>
+<p>Anyway here is a diagram which I hope illustrates what I am talking about 
+here:</p>
+<p>&nbsp;</p>
+<p>Here is a screen shot as well</p>
+<p><a href="WiringBig.png" target="_blank"><img alt="" height="428" src="WiringSmall.png" width="630"></a></p>
+<p>&nbsp;</p>
+<p><em>CLICK THE IMAGE TO SEE A BIGGER VERSION</em></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h2><a name="A-Deeper-Dive-Into-The-Guts-Of-It" id="A-Deeper-Dive-Into-The-Guts-Of-It">A Deeper Dive Into The Guts Of It</a></h2>
+<p>This section will dig a lot deeper into the specifics of how to achieve all 
+the good stuff mentioned above. As I have stated already I am using
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a>, but 
+as I have also stated, the techniques that have been/will be demonstrated in this 
+article would work equally well anywhere where you have a stateful UI, and you 
+use navigation, so things like Windows Phone apps, Silverlight, even Windows 
+forms could be a good candidate for this (where you might use the 
+Model-View-Presenter pattern instead of MVVM).</p>
+<p>&nbsp;</p>
+<h3><a name="Thinking-In-Composable-Views" id="Thinking-In-Composable-Views">Thinking In Composable Views</a></h3>
+<p>&nbsp;</p>
+<p>As I say this pattern (if you will) makes a lot of sense in UIs that can show 
+repeatable bit of information, such as tabs, tiles with workspaces etc etc. 
+Where each Tab or tile may get its own child IOC container.</p>
+<p>Here is a screen shot of the demo app, which makes use of tiles, where each 
+tile gets its own child IOC container, and each tile gets it own set of VM 
+behaviours, which are associated with the VM and child container. The child IOC 
+container is added the tile VM such that when the close button on the <code>
+DataTemplate </code>for the VM is clicked it will call an ICommand in the VM, 
+which will dispose of the VMs disposables, which include the child IOC 
+container.</p>
+<p>Nice (in my opinion) all nice and self contained.</p>
+<p><a href="CompositionBig.png" target="_blank"><img alt="" height="295" src="CompositionSmall.png" width="630"></a></p>
+<p>&nbsp;</p>
+<p><em>CLICK THE IMAGE TO SEE A BIGGER VERSION</em></p>
+<p>&nbsp;</p>
+<p>Ok so enough chat about how it all works, you guys want to see some code 
+don't you. From here on in it's all about the code.</p>
+<p>&nbsp;</p>
+<h3><a name="Disposable-ViewModels-/-Child-Container-Lifecycle-Management" id="Disposable-ViewModels-/-Child-Container-Lifecycle-Management">Disposable ViewModels / Child Container Lifecycle Management</a></h3>
+<p>As I have stated on numerous occassions throughout the article, we couple a 
+child IOC container to the ViewModel as an <code>IDisposable</code>, such that 
+when the ViewModel is asked to close (typically by way of a close <code>ICommand
+</code>implementation), it can call <code>Dispose()</code> on all of the 
+ViewModel held <code>IDisposable</code>s, which includes the child IOC 
+container.</p>
+<p>&nbsp;</p>
+<p>How this is achieved is done using 2 things.</p>
+<p>&nbsp;</p>
+<h4><a name="Disposable-ViewModel" id="Disposable-ViewModel">Disposable ViewModel</a></h4>
+<p>Firstly we need a special base class for our ViewModels (only the top level 
+ones that need the child container should need to inherit from this new base 
+class. I personally find it quite useful to be able to add <code>IDisposable
+</code>instances to the VM though)</p>
+<pre lang="cs">
+public abstract class DisposableViewModel : INPCBase, IDisposable
+{
+    private CompositeDisposable disposables = new CompositeDisposable();
+
+    public void AddDisposable(IDisposable disposable)
+    {
+        disposables.Add(disposable);
+    }
+
+    public virtual void Dispose()
+    {
+        disposables.Dispose();
+    }
+}</pre>
+<p>Where it can be seen that there is a <code>void AddDisposable(IDisposable disposable)</code> method which accepts <code>IDisposable</code> instances 
+which are added to a <code>CompositeDisposable </code>(Rx class, which is really 
+just like a <code>List&lt;IDisposable&gt;</code>). Other ViewViewModel(s) in 
+this demo app would inherit from as follows (in this code there is another base 
+class <code>TileViewModelBase </code>which actually inherits from <code>
+DisposableViewModel</code>, but hopefully you get the idea).</p>
+<p>&nbsp;</p>
+<pre lang="cs">
+public class SpotTileViewModel : TileViewModelBase, INavigationAware
+{
+    private readonly IViewModelController controller;
+
+
+    public SpotTileViewModel(
+        Func&lt;SpotTileViewModel, IViewModelController&gt; controllerFactory,
+        IRegionManager regionManager,
+        IMessageBoxService messageBoxService)
+        : base(regionManager, messageBoxService)
+    {
+
+        controller = controllerFactory(this);
+        this.AddDisposable(controller);
+        controller.Start();
+    }
+}</pre>
+<h4><a name="&nbsp;" id="&nbsp;">&nbsp;</a></h4>
+<h4><a name="Adding-The-Child-IOC-Container-To-ViewModel-As-IDisposable" id="Adding-The-Child-IOC-Container-To-ViewModel-As-IDisposable">Adding The Child IOC Container To ViewModel As IDisposable</a></h4>
+<p>The other part of the puzzle is that when we respond with a navigation 
+request (as I say I am using
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a> but 
+this could be done using whatever navigation process you have in place), is that 
+we would wire up a child IOC container for the current navigation request and 
+then add that child container to the <code>DisposableViewModel </code>(the one 
+that is being navigated to). </p>
+<p>&nbsp;</p>
+<p>As I am using
+<a href="http://compositewpf.codeplex.com/" target="_blank">PRISM 4.1</a> I am 
+using the Microsoft Unity IOC container, but you would use another one of your 
+choice here, as long as it supports the creation of child containers.</p>
+<pre lang="cs">
+private void NavigateToNewSpotTile(ShowNewSpotTileMessage showNewSpotTileMessage)
+{
+    if (regionNavigationCapacityChecker.IsNavigationAllowedForRegion(RegionNames.MainRegion))
+    {
+        UriQuery parameters = new UriQuery();
+        parameters.Add("UniqueId", Guid.NewGuid().ToString());
+
+        IUnityContainer childContainer = ConfigureSpotTileContainer();
+        var uri = new Uri(typeof(SpotTileViewModel).FullName + parameters, UriKind.RelativeOrAbsolute);
+        regionManager.RequestNavigateUsingSpecificContainer(RegionNames.MainRegion, uri,
+            regionNavigationCallbackHelper.HandleNavigationCallback, childContainer);
+    }
+}
+
+
+private IUnityContainer ConfigureSpotTileContainer()
+{
+    IUnityContainer childContainer = container.CreateChildContainer();
+
+    //navigation windows
+    childContainer.RegisterTypeForNavigationWithChildContainer&lt;SpotTileViewModel&gt;(
+        new HierarchicalLifetimeManager());
+
+    //viwemodel controllers
+    childContainer.RegisterType&lt;IViewModelController, SpotTileViewModelController&gt;(
+        "SpotTileViewModelController", new HierarchicalLifetimeManager());
+
+    //viewmodel controller factories
+    childContainer.RegisterType&lt;Func&lt;SpotTileViewModel, IViewModelController&gt;&gt;(
+        new HierarchicalLifetimeManager(),
+        new InjectionFactory(c =&gt;
+            new Func&lt;SpotTileViewModel, IViewModelController&gt;(
+                viewModel =&gt;
+                    c.Resolve&lt;IViewModelController&gt;("SpotTileViewModelController",
+                        new DependencyOverride&lt;SpotTileViewModel&gt;(viewModel)))));
+
+    //behaviours
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, LoadFakeSpotCCYPairsBehaviour&gt;("LoadFakeSpotCCYPairsBehaviour", new HierarchicalLifetimeManager());
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, MonitorFakePairBehaviour&gt;("MonitorFakePairBehaviour", new HierarchicalLifetimeManager());
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, OkCommandBehaviour&gt;("OkCommandBehaviour", new HierarchicalLifetimeManager());
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, TimeoutBehaviour&gt;("TimeoutBehaviour", new HierarchicalLifetimeManager());
+            
+            
+    //services
+    childContainer.RegisterType&lt;IFakeSpotRateProvider, FakeSpotRateProvider&gt;(new HierarchicalLifetimeManager());
+
+    return childContainer;
+}
+</pre>
+<p>The important thing to note in the above code can be condensed to these few 
+points:</p>
+<ul>
+	<li>We create a child container</li>
+	<li>We register the services in the child container using the Unity 
+	HierarchicalLifetimeManager, which means that they are singleton instances 
+	for the scope of the child container</li>
+</ul>
+<p>&nbsp;</p>
+<p><strong>So where does the child container get added to the 
+DisposableViewModel?</strong></p>
+<p>Well for me that is done in the following extension method:</p>
+<pre lang="cs">
+public static void RegisterTypeForNavigationWithChildContainer&lt;T&gt;(this IUnityContainer container, LifetimeManager lifetimeManager)
+{
+    container.RegisterType(typeof(Object), typeof(T), typeof(T).FullName,
+        lifetimeManager,
+        new InjectionMethod("AddDisposable", new object[] { container }));
+}
+</pre>
+<p>&nbsp;</p>
+<p>But as I say you may have to find your own way of doing that, depending on 
+your requirements, the only important part is that you add the child container 
+to the <code>DisposableViewModel </code>that is being navigated to.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h3><a name="ViewModel-Navigation-/-Child-Containers" id="ViewModel-Navigation-/-Child-Containers">ViewModel Navigation / Child Containers</a></h3>
+<p>So we now know some of what is going on, we know we will create a new child 
+container when a ViewModel is requested to be navigated to, and that we add the 
+child container to this ViewModel.</p>
+<p>So how do we deal with showing the ViewModel. The answer to that for me is to 
+use a <code>DataTemplate </code>that represents the ViewModel. Here is the <code>
+DataTemplate </code>for the demo apps <code>SpotTileViewModel</code>.</p>
+<pre lang="xml">
+&lt;DataTemplate DataType="{x:Type viewModels:SpotTileViewModel}"&gt;
+    &lt;Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2,2,2,2"
+            Background="White" IsHitTestVisible="True"&gt;
+
+        &lt;Grid Background="White"
+            attachedProps:GridUtils.ColumnDefinitions="*"
+            attachedProps:GridUtils.RowDefinitions="Auto,Auto,Auto,*,Auto"&gt;
+ 
+
+            &lt;Grid HorizontalAlignment="Stretch" 
+            		Background="{DynamicResource AccentBrush}"&gt;
+                &lt;Label Foreground="White" Content="Spot Tile" 
+                		VerticalAlignment="Center"
+                        VerticalContentAlignment="Center" Margin="2,0,0,0"  /&gt;
+                &lt;Button Style="{DynamicResource toolbarButtonStyle}"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center" 
+                                        VerticalContentAlignment="Center" Margin="0,0,0,0"
+                                        Command="{Binding CloseViewCommand}" 
+                                        ToolTip="Close"&gt;
+                    &lt;Viewbox Width="40" Height="40"&gt;
+                        &lt;Grid&gt;
+                            &lt;Grid Width="128" Height="128" &gt;
+                                &lt;Rectangle Fill="{Binding 
+                                	RelativeSource={RelativeSource 
+                                		AncestorType={x:Type Button} }, Path=Background}"
+                                    Margin="20"/&gt;
+                            &lt;/Grid&gt;
+                            &lt;Path Data="F1M54.0573,47.8776L38.1771,31.9974 54.0547,16.1198C55.7604,14.4141 55.7604,11.6511 54.0573,9.94531 52.3516,8.23962 49.5859,8.23962 47.8802,9.94531L32.0026,25.8229 16.1224,9.94531C14.4167,8.23962 11.6511,8.23962 9.94794,9.94531 8.24219,11.6511 8.24219,14.4141 9.94794,16.1198L25.8255,32 9.94794,47.8776C8.24219,49.5834 8.24219,52.3477 9.94794,54.0534 11.6511,55.7572 14.4167,55.7585 16.1224,54.0534L32.0026,38.1745 47.8802,54.0534C49.5859,55.7585 52.3516,55.7572 54.0573,54.0534 55.7604,52.3477 55.763,49.5834 54.0573,47.8776z" 
+                                Stretch="Uniform" 
+                                	Fill="{Binding RelativeSource={RelativeSource AncestorType={x:Type Button} }, 
+                                	Path=Foreground}" Width="26" Height="26" /&gt;
+                        &lt;/Grid&gt;
+                    &lt;/Viewbox&gt;
+                &lt;/Button&gt;
+            &lt;/Grid&gt;
+                
+            &lt;StackPanel Orientation="Horizontal" Grid.Row="1"&gt;
+                    
+                &lt;ComboBox HorizontalAlignment="Center" Width="80" Margin="2"
+                            ItemsSource="{Binding FakeSpotPairs}" 
+                            SelectedItem="{Binding FakeSpotPair}"
+                            IsEnabled="{Binding IsEnabled}"/&gt;
+                &lt;DatePicker SelectedDate="{Binding SelectedDate}" 
+                			Width="100" Margin="2"
+                            IsEnabled="{Binding IsEnabled}"/&gt;
+            &lt;/StackPanel&gt;
+             
+                
+            &lt;Grid Background="White" Grid.Row="2"
+                attachedProps:GridUtils.ColumnDefinitions="*,*"
+                attachedProps:GridUtils.RowDefinitions="Auto"&gt;
+
+                 
+                &lt;ContentControl Content="{Binding RateViewModel}"
+                                Margin="2,0,0,0"
+                                IsEnabled="{Binding IsEnabled}"/&gt;
+
+                &lt;StackPanel Grid.Row="0" Grid.Column="1" 
+                            Orientation="Vertical"
+                            Visibility="{Binding StartedTiming, 
+                                Converter={x:Static 
+                                	converters:BoolToVisibilityConverter.Instance},
+                                ConverterParameter='True'}"&gt;
+
+                    &lt;ProgressBar Value="{Binding Progress}" 
+                                    Style="{StaticResource SegmentedProgressBarStyle}" 
+                                    Margin="5" Width="40" Height="40"&gt;&lt;/ProgressBar&gt;
+
+
+                    &lt;Label Content="{Binding TimeOutRemaining}" 
+                    		IsEnabled="{Binding IsEnabled}"
+                            VerticalAlignment="Bottom" 
+                            HorizontalAlignment="Center" Margin="2"/&gt;
+                &lt;/StackPanel&gt;
+
+            &lt;/Grid&gt;
+                
+            &lt;Button Content="Ok" Margin="2" Grid.Row="4" 
+            		Command="{Binding OkCommand}"/&gt;
+                
+        &lt;/Grid&gt;
+    &lt;/Border&gt;
+
+        
+&lt;/DataTemplate&gt;
+</pre>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h4><a name="Cleaning-Up-The-IOC-Services-For-The-Navigation-Request" id="Cleaning-Up-The-IOC-Services-For-The-Navigation-Request">Cleaning Up The IOC Services For The Navigation Request</a></h4>
+<p>So how do we <code>Dispose()</code> of the child container and all its held 
+resources. Well ideally the DataTemplate/ViewModel pair will have a close button 
+(or some other way of removing) to remove the ViewModel from the workspace). In 
+the demo app when the&nbsp; <strong>Close button</strong> is clicked it will run 
+the following code, which disposes of ALL the held <code>IDisposable </code>instances held by 
+the ViewModel. The child IOC container is one of these. </p>
+<p>Simply put, when the ViewModel is removed, the child container and all the 
+services it holds are all asked to <code>Dispose()</code>.</p>
+<p>&nbsp;</p>
+<pre lang="cs">
+public abstract class TileViewModelBase : DisposableViewModel
+{
+    public TileViewModelBase(
+        IRegionManager regionManager,
+        IMessageBoxService messageBoxService)
+    {
+        this.regionManager = regionManager;
+        this.messageBoxService = messageBoxService;
+        CloseViewCommand = new SimpleCommand&lt;object, object&gt;(ExecuteCloseViewCommand);
+    }
+        
+
+    public ICommand CloseViewCommand { get; set; }
+
+    private void ExecuteCloseViewCommand(Object arg)
+    {
+        var result = messageBoxService.ShowYesNo(
+            "You are about to close this Option, you will loose any edits you have. Are you sure?",
+            "Confirm close",
+            CustomDialogIcons.Warning);
+
+        if (result == CustomDialogResults.Yes)
+        {
+            IRegion region = regionManager.Regions["MainRegion"];
+            region.Remove(this);
+            this.Dispose();
+        }
+    }
+}
+</pre>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h3><a name="The-ViewModel-Controller-And-The-Case-Of-The-&quot;ViewModel-Behaviours&quot;" id="The-ViewModel-Controller-And-The-Case-Of-The-&quot;ViewModel-Behaviours&quot;">The ViewModel Controller And The Case Of The &quot;ViewModel Behaviours&quot;</a></h3>
+<p>Another thing that makes this all hum is to have most of the harsh ICommand 
+logic (and other logic) moved out of the ViewModel, such that the ViewModel can 
+concentrate on doing what it needs to do, which is to be <strong>A MODEL FOR THE 
+VIEW</strong>. So how do we go about moving stuff out of the ViewModel?</p>
+<p>The trick to that lies in 2 things for the demo app.</p>
+<p>&nbsp;</p>
+<h4><a name="<strong>ViewModel/Controller-Relationship</strong>" id="<strong>ViewModel/Controller-Relationship</strong>"><strong>ViewModel/Controller Relationship</strong></a></h4>
+<p>For each of these top level VMs that are navigated to (using whatever 
+technique you prefer), there is a 1:1 mapping between the VM and a single 
+Controller. The Controller takes the VM as a dependancy, as well as a collection 
+of VM Behaviours (which we will see in a minute).</p>
+<p>&nbsp;</p>
+<ul>
+	<li>The ViewModel role is to take a factory for the controller as a 
+	dependency, and then uses the factory passing itself to the controller 
+	factory which returns a controller for the VM. The VM then calls start (I am 
+	a big fan of deterministic starting of things). The VM adds the controller 
+	as a <code>IDisposable </code>to the VMs list of <code>IDisposable</code>s, 
+	such that the VM being disposed will also clean up the controller and its 
+	dependencies</li>
+	<li>The controller takes the VM and a collection of <strong>specific</strong> 
+	VM behaviours as constructor parameters. When the start method is called on 
+	the controller it will in turn call Start() on each of the <strong>specific</strong> 
+	VM behaviours. The controller will also add each of the <strong>specific</strong> 
+	VM behaviours to it own list of <code>IDisposable</code>s.</li>
+</ul>
+<p>&nbsp;</p>
+<p>Here is the relevant code that makes this happen</p>
+<p>&nbsp;</p>
+<p><strong>VM code</strong></p>
+<pre lang="cs">
+public class SpotTileViewModel : TileViewModelBase, INavigationAware
+{
+    private readonly IViewModelController controller;
+
+    public SpotTileViewModel(
+        Func&lt;SpotTileViewModel, IViewModelController&gt; controllerFactory,
+        ....)
+        : base(.....)
+    {
+        controller = controllerFactory(this);
+        this.AddDisposable(controller);
+        controller.Start();
+    }
+}
+</pre>
+<p>The take away point here is that the VM gets a factory to create a controller, and it then uses that</p>
+<p>&nbsp;</p>
+<p><strong>Controller Code</strong></p>
+<pre lang="cs">
+public class SpotTileViewModelController : IViewModelController
+{
+    private CompositeDisposable disposables = new CompositeDisposable();
+    private readonly SpotTileViewModel spotTileViewModel;
+    private readonly ISpotTileViewModelBehaviour[] behaviors;
+
+    public SpotTileViewModelController(
+        SpotTileViewModel spotTileViewModel,
+        ISpotTileViewModelBehaviour[] behaviors)
+    {
+        this.spotTileViewModel = spotTileViewModel;
+        this.behaviors = behaviors;
+    }
+
+    public void Start()
+    {
+        //start behaviors
+        foreach (var behavior in behaviors)
+        {
+            disposables.Add(behavior);
+            behavior.Start(spotTileViewModel);
+        }
+    }
+
+    public void Dispose()
+    {
+        disposables.Dispose();
+    }
+}</pre>
+<p>The take away point this time is that the controller expects a particular type of VM and also a collection of a specific type
+of VM behaviours. It then calls the <code>Start()</code> method on each of these specific VM behaviours passing in the actual VM</p>
+<p>&nbsp;</p>
+<p><strong>IOC Wireup Code</strong></p>
+<p>Obviously there is some voodoo going on to wir this all up nicely. That is the job of the IOC container. Which is done as follows. As I have
+previously stated I am using the Microsoft Unity application block, so you may need to change this for your needs/IOC container of choice.</p>
+<pre lang="cs">
+private IUnityContainer ConfigureSpotTileContainer()
+{
+    IUnityContainer childContainer = container.CreateChildContainer();
+
+    //navigation windows
+    childContainer.RegisterTypeForNavigationWithChildContainer&lt;SpotTileViewModel&gt;(
+        new HierarchicalLifetimeManager());
+
+    //viwemodel controllers
+    childContainer.RegisterType&lt;IViewModelController, SpotTileViewModelController&gt;(
+        "SpotTileViewModelController", new HierarchicalLifetimeManager());
+
+    //viewmodel controller factories
+    childContainer.RegisterType&lt;Func&lt;SpotTileViewModel, IViewModelController&gt;&gt;(
+        new HierarchicalLifetimeManager(),
+        new InjectionFactory(c =&gt;
+            new Func&lt;SpotTileViewModel, IViewModelController&gt;(
+                viewModel =&gt;
+                    c.Resolve&lt;IViewModelController&gt;("SpotTileViewModelController",
+                        new DependencyOverride&lt;SpotTileViewModel&gt;(viewModel)))));
+
+    //behaviours
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, 
+	LoadFakeSpotCCYPairsBehaviour&gt;("LoadFakeSpotCCYPairsBehaviour", 
+	new HierarchicalLifetimeManager());
+
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, 
+	MonitorFakePairBehaviour&gt;("MonitorFakePairBehaviour", 
+	new HierarchicalLifetimeManager());
+
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, 
+	OkCommandBehaviour&gt;("OkCommandBehaviour", 
+	new HierarchicalLifetimeManager());
+
+    childContainer.RegisterType&lt;ISpotTileViewModelBehaviour, 
+	TimeoutBehaviour&gt;("TimeoutBehaviour", 
+	new HierarchicalLifetimeManager());
+            
+            
+    //services
+    childContainer.RegisterType&lt;IFakeSpotRateProvider, 
+	FakeSpotRateProvider&gt;(new HierarchicalLifetimeManager());
+
+    return childContainer;
+}</pre>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h4><a name="<strong>ViewModel-</strong>Behaviours" id="<strong>ViewModel-</strong>Behaviours"><strong>ViewModel </strong>Behaviours</a></h4>
+<p>Ah finally the meat of the article. So what are these VM behaviours? I like 
+to think of them as either attached VM behaviours or micro controllers, where 
+each behaviour does a specific job for the ViewModel in question.</p>
+<p>So how do we create a VM behaviour? Well it starts with an interface that is
+<strong>specific</strong> to your VM needs. Here is the one that is used for the 
+demo app:</p>
+<pre lang="cs">
+public interface ISpotTileViewModelBehaviour : IDisposable
+{
+    void Start(SpotTileViewModel spotTileViewModel);
+}
+</pre>
+<p>&nbsp;</p>
+<p>Remember these are used and started by the ONE controller for the VM in 
+question. The idea is that each behaviour does ONE thing, and ONE thing only. 
+This might include:</p>
+<p>&nbsp;</p>
+<ol>
+	<li>Listening to a certain property changing (such as an ID, which causes 
+	the whole entity to be fetched and populated from the DB)</li>
+	<li>Listening to a group of related properties that MUST ALL be set before 
+	some action occurs</li>
+	<li>Listening to a command being executed (we will use RX for this, but more 
+	on this later)</li>
+</ol>
+<p>&nbsp;</p>
+<p>By following this design it is VERY easy to isolate things, and find things, 
+and also to be pretty sure the code you are modifiying will not impact other 
+parts of the system. <strong>Seperation Of Concerns</strong> and all that.</p>
+<p>&nbsp;</p>
+<p>For example consider this screen shot for the demo app:</p>
+<p>&nbsp;</p>
+<p><img alt="" height="299" src="Behs.png" width="630"></p>
+<p>&nbsp;</p>
+<p>If you wanted to find out what was wrong with the OkCommand implementation, 
+where would you look, oh in the &quot;OkCommandBehavior&quot; you say.</p>
+<p>&nbsp;</p>
+<p>If you wanted to find out what was wrong with the timeout implementation, 
+where would you look, oh in the &quot;TimeOutBehavior&quot; you say.</p>
+<p>&nbsp;</p>
+<p>etc etc....You get the idea</p>
+<p>&nbsp;</p>
+<p><span style="background:yellow; color:black; border:1px black solid"><strong>NOTE :</strong> Some readers may just dismiss this as being a &quot;Proper&quot;/"Poor" 
+(depending on how you think/argue) implementation of the &quot;Command Pattern&quot; but it is much 
+more flexible than that. You do not necessarily need to perform actions based on user input, as stated above it 
+could be based on some other VM property changing. You have the VM in scope so it or ANY of its child properties/VMs 
+are also available to change/listen to</span></p>
+<p>&nbsp;</p>
+<h3><a name="Reactive-Commands" id="Reactive-Commands">Reactive Commands</a></h3>
+<p>Another thing that is VERY useful in this pattern is the use of a <code>
+ReactiveCommand </code>that will use RX internally.The Reactive command still 
+implements <code>ICommand</code>, and will <code>OnNext()</code> and internal RX 
+Subject when the command is executed. By using an <code>ReactiveCommand </code>
+that means anywhere you can see the ViewModel you can use the full power of the 
+RX operators, and there are loads (as many as LINQ and then some), and also be 
+able to subsribe to the command when it executes.</p>
+<p>Here is the <code>ReactiveCommand </code>implementation</p>
+<pre lang="cs">
+public class ReactiveCommand&lt;T1, T2&gt; : ICommand, IReactiveCommand
+{
+    private Func&lt;T1, bool&gt; canExecuteMethod;
+    private Subject&lt;object&gt; commandExecutedSubject = new Subject&lt;object&gt;();
+
+    public ReactiveCommand()
+    {
+        this.canExecuteMethod = (x) =&gt; { return true; };
+    }
+
+    public ReactiveCommand(Func&lt;T1, bool&gt; canExecuteMethod)
+    {
+        this.canExecuteMethod = canExecuteMethod;
+    }
+
+    public bool CanExecute(T1 parameter)
+    {
+        if (canExecuteMethod == null) return true;
+        return canExecuteMethod(parameter);
+    }
+
+    public void Execute(T2 parameter)
+    {
+        commandExecutedSubject.OnNext(parameter);
+    }
+
+    public bool CanExecute(object parameter)
+    {
+        return CanExecute((T1)parameter);
+    }
+
+    public void Execute(object parameter)
+    {
+        Execute((T2)parameter);
+    }
+
+    public event EventHandler CanExecuteChanged
+    {
+        add
+        {
+            if (canExecuteMethod != null)
+            {
+                CommandManager.RequerySuggested += value;
+            }
+        }
+
+        remove
+        {
+            if (canExecuteMethod != null)
+            {
+                CommandManager.RequerySuggested -= value;
+            }
+        }
+    }
+
+
+    public IObservable&lt;object&gt; CommandExecutedStream
+    {
+        get { return this.commandExecutedSubject.AsObservable(); }
+    }
+}
+</pre>
+<p>&nbsp;</p>
+<p>It can be seen that the <code>ReactiveCommand </code>also take a <code>
+CanExecute </code>delegate, which means you can use it directly in your 
+viewmodel. The other important part of the execute internally calls <code>
+OnNext()</code> on a <code>Subject&lt;object&gt;</code> where the object is the <code>
+ICommand </code>parameter, which you could supply from code or XAML.</p>
+<p>&nbsp;</p>
+<p>Here is an example usage from a ViewModel</p>
+<pre lang="cs">
+OkCommand = new ReactiveCommand<object, object>(x =&gt; IsValid() &amp;&amp; IsEnabled);</pre>
+<p>&nbsp;</p>
+<p>And here is example of subscribing to the command ONCE it executes. I have 
+includes a complete VM behavior here to give you an idea of the sort of thing 
+you can do with a <code>ReactiveCommand </code>and the VM behaviours idea (each 
+doing one thing only)</p>
+<p>&nbsp;</p>
+<pre lang="cs">
+public class OkCommandBehaviour : ISpotTileViewModelBehaviour
+{
+    private readonly IEventMessager eventMessager;
+    private SpotTileViewModel spotTileViewModel;
+    private CompositeDisposable disposables = new CompositeDisposable();
+
+    public OkCommandBehaviour(IEventMessager eventMessager)
+    {
+        this.eventMessager = eventMessager;
+    }
+
+    public void Dispose()
+    {
+        disposables.Dispose();
+    }
+
+    public void Start(SpotTileViewModel spotTileViewModel)
+    {
+        this.spotTileViewModel = spotTileViewModel;
+        SetupTopLevelSubscription();
+    }
+
+    private void SetupTopLevelSubscription()
+    {
+           
+
+        disposables.Add(spotTileViewModel.OkCommand.CommandExecutedStream.Subscribe(
+            x =&gt;
+            {
+                spotTileViewModel.IsEnabled = false;
+                eventMessager.Publish(new SpotTrade(
+                    spotTileViewModel.SelectedDate,
+                    spotTileViewModel.FakeSpotPair,
+                    spotTileViewModel.RateViewModel.WholeRate,
+                    DateTime.Now));
+            }));
+    }
+}</pre>
+<p>&nbsp;</p>
+<h3><a name="Further-Case-For-RX" id="Further-Case-For-RX">Further Case For RX</a></h3>
+<p>Another case for RX is that of monitoring properties via the <code>
+INotifyPropertyChanged </code>interface that XAML ViewModel(s) typically 
+implement. Or even listening to <code>ObservableCollection</code>(s) changing 
+where items are added/removed. I typically have a bunch of extension methods 
+floating about to aid in this matter. Here is the one from the demo project:</p>
+<pre lang="cs">
+public class ItemPropertyChangedEvent&lt;TSender&gt;
+    {
+        public TSender Sender { get; set; }
+        public PropertyInfo Property { get; set; }
+        public bool HasOld { get; set; }
+        public object OldValue { get; set; }
+        public object NewValue { get; set; }
+
+        public override string ToString()
+        {
+            return string.Format("Sender: {0}, Property: {1}, HasOld: {2}, OldValue: {3}, NewValue: {4}", this.Sender, this.Property, this.HasOld, this.OldValue, this.NewValue);
+        }
+    }
+
+    public class ItemPropertyChangedEvent&lt;TSender, TProperty&gt;
+    {
+        public TSender Sender { get; set; }
+        public PropertyInfo Property { get; set; }
+        public bool HasOld { get; set; }
+        public TProperty OldValue { get; set; }
+        public TProperty NewValue { get; set; }
+    }
+
+    public class ItemChanged&lt;T&gt;
+    {
+        public T Item { get; set; }
+        public bool Added { get; set; }
+        public NotifyCollectionChangedEventArgs EventArgs { get; set; }
+    }
+
+
+    public class WeakSubscription&lt;T&gt; : IDisposable, IObserver&lt;T&gt;
+    {
+        private readonly WeakReference reference;
+        private readonly IDisposable subscription;
+        private bool disposed;
+
+        public WeakSubscription(IObservable&lt;T&gt; observable, IObserver&lt;T&gt; observer)
+        {
+            this.reference = new WeakReference(observer);
+            this.subscription = observable.Subscribe(this);
+        }
+
+        void IObserver&lt;T&gt;.OnCompleted()
+        {
+            var observer = (IObserver&lt;T&gt;)this.reference.Target;
+            if (observer != null)
+                observer.OnCompleted();
+            else
+                this.Dispose();
+        }
+
+
+        void IObserver&lt;T&gt;.OnError(Exception error)
+        {
+            var observer = (IObserver&lt;T&gt;)this.reference.Target;
+            if (observer != null)
+                observer.OnError(error);
+            else
+                this.Dispose();
+        }
+
+        void IObserver&lt;T&gt;.OnNext(T value)
+        {
+            var observer = (IObserver&lt;T&gt;)this.reference.Target;
+            if (observer != null)
+                observer.OnNext(value);
+            else
+                this.Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (!this.disposed)
+            {
+                this.disposed = true;
+                this.subscription.Dispose();
+            }
+        }
+    }
+
+    public static class ObservableExtensions
+    {
+        public static IObservable&lt;Unit&gt; AsUnit&lt;TValue&gt;(this IObservable&lt;TValue&gt; source)
+        {
+            return source.Select(x =&gt; new Unit());
+        }
+
+        public static IObservable&lt;TItem&gt; ObserveWeakly&lt;TItem&gt;(this IObservable&lt;TItem&gt; source)
+        {
+            return Observable.Create&lt;TItem&gt;(obs =&gt;
+            {
+                var weakSubscription = new WeakSubscription&lt;TItem&gt;(source, obs);
+                return () =&gt;
+                {
+                    weakSubscription.Dispose();
+                };
+            });
+        }
+
+
+        public static IObservable&lt;Unit&gt; ObserveCollectonChanged&lt;T&gt;(this T source)
+           where T : INotifyCollectionChanged
+        {
+            var observable = Observable
+                .FromEvent&lt;NotifyCollectionChangedEventHandler, NotifyCollectionChangedEventArgs&gt;(
+                    h =&gt; source.CollectionChanged += h,
+                    h =&gt; source.CollectionChanged -= h)
+                .AsUnit();
+
+            return observable;
+        }
+
+
+        public static IObservable&lt;Unit&gt; ObserveCollectonChanged&lt;T&gt;(this T source, NotifyCollectionChangedAction collectionChangeAction)
+           where T : INotifyCollectionChanged
+        {
+            var observable = Observable
+                .FromEvent&lt;NotifyCollectionChangedEventHandler, NotifyCollectionChangedEventArgs&gt;(
+                    h =&gt; source.CollectionChanged += h,
+                    h =&gt; source.CollectionChanged -= h)
+                .Where(x =&gt; x.Action == collectionChangeAction)
+                .AsUnit();
+
+            return observable;
+        }
+
+        public static IObservable&lt;ItemChanged&lt;T&gt;&gt; ItemChanged&lt;T&gt;(this ObservableCollection&lt;T&gt; collection, bool fireForExisting = false)
+        {
+            var observable = Observable.Create&lt;ItemChanged&lt;T&gt;&gt;(obs =&gt;
+            {
+                NotifyCollectionChangedEventHandler handler = null;
+                handler = (s, a) =&gt;
+                {
+                    if (a.NewItems != null)
+                    {
+                        foreach (var item in a.NewItems.OfType&lt;T&gt;())
+                        {
+                            obs.OnNext(new ItemChanged&lt;T&gt;()
+                            {
+                                Item = item,
+                                Added = true,
+                                EventArgs = a
+                            });
+                        }
+                    }
+                    if (a.OldItems != null)
+                    {
+                        foreach (var item in a.OldItems.OfType&lt;T&gt;())
+                        {
+                            obs.OnNext(new ItemChanged&lt;T&gt;()
+                            {
+                                Item = item,
+                                Added = false,
+                                EventArgs = a
+                            });
+                        }
+                    }
+                };
+                collection.CollectionChanged += handler;
+                return () =&gt;
+                {
+                    collection.CollectionChanged -= handler;
+                };
+            });
+
+            if (fireForExisting)
+                observable = observable.StartWith(Scheduler.CurrentThread, collection.Select(i =&gt; new ItemChanged&lt;T&gt;()
+                {
+                    Item = i,
+                    Added = true,
+                    EventArgs = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, i)
+                }).ToArray());
+
+            return observable;
+        }
+
+
+        public static IObservable&lt;TObserved&gt; ObserveInner&lt;TItem, TObserved&gt;(this ObservableCollection&lt;TItem&gt; collection, Func&lt;TItem, IObservable&lt;TObserved&gt;&gt; observe)
+        {
+            return Observable.Create&lt;TObserved&gt;(obs =&gt;
+            {
+                Dictionary&lt;TItem, IDisposable&gt; subscriptions = new Dictionary&lt;TItem, IDisposable&gt;();
+
+                var mainSubscription =
+                    collection.ItemChanged(true)
+                       .Subscribe(change =&gt;
+                       {
+                           IDisposable subscription = null;
+                           subscriptions.TryGetValue(change.Item, out subscription);
+                           if (change.Added)
+                           {
+                               if (subscription == null)
+                               {
+                                   subscription = observe(change.Item).Subscribe(obs);
+                                   subscriptions.Add(change.Item, subscription);
+                               }
+                           }
+                           else
+                           {
+                               if (subscription != null)
+                               {
+                                   subscriptions.Remove(change.Item);
+                                   subscription.Dispose();
+                               }
+                           }
+                       });
+
+                return () =&gt;
+                {
+                    mainSubscription.Dispose();
+                    foreach (var subscription in subscriptions)
+                        subscription.Value.Dispose();
+                };
+            });
+
+        }
+
+        public static IObservable&lt;TValue&gt; ObserveProperty&lt;T, TValue&gt;(this T source,
+            Expression&lt;Func&lt;T, TValue&gt;&gt; propertyExpression) where T : INotifyPropertyChanged
+        {
+            return source.ObserveProperty(propertyExpression, false);
+        }
+
+        public static IObservable&lt;TValue&gt; ObserveProperty&lt;T, TValue&gt;(this T source,
+            Expression&lt;Func&lt;T, TValue&gt;&gt; propertyExpression,
+            bool observeInitialValue) where T : INotifyPropertyChanged
+        {
+            var getter = propertyExpression.Compile();
+
+            var observable = Observable
+                .FromEvent&lt;PropertyChangedEventHandler, PropertyChangedEventArgs&gt;(
+                    h =&gt; source.PropertyChanged += h,
+                    h =&gt; source.PropertyChanged -= h)
+                .Where(x =&gt; x.PropertyName == propertyExpression.GetPropertyName())
+                .Select(_ =&gt; getter(source));
+
+            if (observeInitialValue)
+                return observable.Merge(Observable.Return(getter(source)));
+
+            return observable;
+        }
+
+
+        public static IObservable&lt;string&gt; ObservePropertyChanged&lt;T&gt;(this T source)
+           where T : INotifyPropertyChanged
+        {
+            var observable = Observable
+                .FromEvent&lt;PropertyChangedEventHandler, PropertyChangedEventArgs&gt;(
+                    h =&gt; source.PropertyChanged += h,
+                    h =&gt; source.PropertyChanged -= h)
+                .Select(x =&gt; x.PropertyName);
+
+            return observable;
+        }
+
+
+        public static IObservable&lt;ItemPropertyChangedEvent&lt;TItem, TProperty&gt;&gt; ObservePropertyChanged&lt;TItem, TProperty&gt;(this TItem target, Expression&lt;Func&lt;TItem, TProperty&gt;&gt; propertyName, bool fireCurrentValue = false) where TItem : INotifyPropertyChanged
+        {
+            var property = ExpressionExtensions.GetPropertyName(propertyName);
+
+            return ObservePropertyChanged(target, property, fireCurrentValue)
+                   .Select(i =&gt; new ItemPropertyChangedEvent&lt;TItem, TProperty&gt;()
+                   {
+                       HasOld = i.HasOld,
+                       NewValue = (TProperty)i.NewValue,
+                       OldValue = i.OldValue == null ? default(TProperty) : (TProperty)i.OldValue,
+                       Property = i.Property,
+                       Sender = i.Sender
+                   });
+        }
+
+
+        public static IObservable&lt;ItemPropertyChangedEvent&lt;TItem&gt;&gt; ObservePropertyChanged&lt;TItem&gt;(this TItem target, string propertyName = null, bool fireCurrentValue = false) where TItem : INotifyPropertyChanged
+        {
+            if (propertyName == null &amp;&&amp; fireCurrentValue)
+                throw new InvalidOperationException("You need to specify a propertyName if you want to fire the current value of your property");
+
+            return Observable.Create&lt;ItemPropertyChangedEvent&lt;TItem&gt;&gt;(obs =&gt;
+            {
+                Dictionary&lt;PropertyInfo, object&gt; oldValues = new Dictionary&lt;PropertyInfo, object&gt;();
+                Dictionary&lt;string, PropertyInfo&gt; properties = new Dictionary&lt;string, PropertyInfo&gt;();
+                PropertyChangedEventHandler handler = null;
+
+                handler = (s, a) =&gt;
+                {
+                    if (propertyName == null || propertyName == a.PropertyName)
+                    {
+                        PropertyInfo prop = null;
+                        if (!properties.TryGetValue(a.PropertyName, out prop))
+                        {
+                            prop = typeof(TItem).GetProperty(a.PropertyName);
+                            properties.Add(a.PropertyName, prop);
+                        }
+                        var change = new ItemPropertyChangedEvent&lt;TItem&gt;()
+                        {
+                            Sender = target,
+                            Property = prop,
+                            NewValue = prop.GetValue(target, null)
+                        };
+                        object oldValue = null;
+                        if (oldValues.TryGetValue(prop, out oldValue))
+                        {
+                            change.HasOld = true;
+                            change.OldValue = oldValue;
+                            oldValues[prop] = change.NewValue;
+                        }
+                        else
+                        {
+                            oldValues.Add(prop, change.NewValue);
+                        }
+                        obs.OnNext(change);
+                    }
+                };
+
+                target.PropertyChanged += handler;
+
+                if (propertyName != null &amp;&amp; fireCurrentValue)
+                    handler(target, new PropertyChangedEventArgs(propertyName));
+
+                return () =&gt;
+                {
+                    target.PropertyChanged -= handler;
+                };
+            });
+        }
+
+    }
+    </pre>
+<p>In here you will find a great many useful methods for working with RX, it has 
+been my savior on many occassions.</p>
+<p>&nbsp;</p>
+<h3><a name="Typical-VM-Behaviour-Code" id="Typical-VM-Behaviour-Code">Typical VM Behaviour Code</a></h3>
+<p>I thought a nice way to end things would be to list a few behaviours from the 
+demo app so you could get a flavour of them. You have already seen the <code>
+OkBehaviour </code>above, so lets look at a few different ones.</p>
+<p>&nbsp;</p>
+<p><strong>MonitorFakePairBehaviour</strong></p>
+<p>This one does the job of listening to the chose currency pair, and then listening to changes from a fake rate pair symbol ticker</p>
+<pre lang="cs">
+public class MonitorFakePairBehaviour : ISpotTileViewModelBehaviour
+{
+    private readonly IFakeSpotRateProvider fakeSpotRateProvider;
+    private SpotTileViewModel spotTileViewModel;
+    private CompositeDisposable disposables = new CompositeDisposable();
+    private CompositeDisposable fakePairDisposables = new CompositeDisposable();
+
+    public MonitorFakePairBehaviour(IFakeSpotRateProvider fakeSpotRateProvider)
+    {
+        this.fakeSpotRateProvider = fakeSpotRateProvider;
+        disposables.Add(this.fakeSpotRateProvider);
+    }
+
+    public void Dispose()
+    {
+        disposables.Dispose();
+        fakePairDisposables.Dispose();
+    }
+
+    public void Start(SpotTileViewModel spotTileViewModel)
+    {
+        this.spotTileViewModel = spotTileViewModel;
+        SetupTopLevelSubscription();
+    }
+
+    private void SetupTopLevelSubscription()
+    {
+        //listen for changes in the number of legs
+        DisposableHelper.CreateNewCompositeDisposable(ref fakePairDisposables);
+        fakePairDisposables.Add(spotTileViewModel.ObservePropertyChanged(x =&amp;gt; x.FakeSpotPair)
+                                .Where(x =&amp;gt; !string.IsNullOrEmpty(x.NewValue))
+                                .Subscribe(x =&amp;gt;
+                                {
+                                    this.SetupFakePairSubscription();
+                                }));
+
+        if (!string.IsNullOrEmpty(spotTileViewModel.FakeSpotPair))
+        {
+            SetupFakePairSubscription();
+        }
+    }
+
+    private void SetupFakePairSubscription()
+    {
+        if (spotTileViewModel == null)
+            return;
+
+
+        fakePairDisposables.Add(fakeSpotRateProvider.MonitorFakePair(spotTileViewModel.FakeSpotPair)
+            .Subscribe(x =&amp;gt;
+            {
+                if (spotTileViewModel.IsEnabled)
+                {
+                    spotTileViewModel.RateViewModel.AcceptNewPrice(x);
+                }
+            }));
+    }
+}</pre>
+<p>&nbsp;</p>
+<p><strong>TimeoutBehaviour</strong></p>
+<p>This one does the job of starting a timer when the ViewModel has picked a Currency pair. The timeout will end up disabling
+the ViewModel when the timeout period elapses</p>
+<pre lang="cs">
+public class TimeoutBehaviour : ISpotTileViewModelBehaviour
+{
+    private SpotTileViewModel spotTileViewModel;
+    private CompositeDisposable disposables = new CompositeDisposable();
+    private CompositeDisposable fakePairDisposables = new CompositeDisposable();
+
+
+    public TimeoutBehaviour()
+    {
+    }
+
+    public void Dispose()
+    {
+        disposables.Dispose();
+        fakePairDisposables.Dispose();
+    }
+
+    public void Start(SpotTileViewModel spotTileViewModel)
+    {
+        this.spotTileViewModel = spotTileViewModel;
+        SetupTopLevelSubscription();
+    }
+
+
+
+    private void SetupTopLevelSubscription()
+    {
+        //listen for changes in the number of legs
+        DisposableHelper.CreateNewCompositeDisposable(ref fakePairDisposables);
+        fakePairDisposables.Add(spotTileViewModel
+				.ObservePropertyChanged(x =&gt; x.FakeSpotPair)
+                                .Where(x =&gt; !string.IsNullOrEmpty(x.NewValue))
+                                .Subscribe(x =&gt;
+                                {
+                                    this.SetupFakePairSubscription();
+                                }));
+
+        if (!string.IsNullOrEmpty(spotTileViewModel.FakeSpotPair))
+        {
+            SetupFakePairSubscription();
+        }
+    }
+
+    private void SetupFakePairSubscription()
+    {
+        if (spotTileViewModel == null)
+            return;
+
+        SetupTimeOutSubscription();
+
+    }
+
+
+    private void SetupTimeOutSubscription()
+    {
+        //this.disposables.Dispose();
+        spotTileViewModel.StartedTiming = true;
+
+        int counter = 0;
+        UpdateProgress(counter);
+
+          
+
+        var tileDisabledObservable = spotTileViewModel
+	    .ObservePropertyChanged(x =&gt; x.IsEnabled)
+            .Where(x =&gt; !x.NewValue);
+            
+
+        this.disposables.Add(Observable.Interval(
+		TimeSpan.FromSeconds(Globals.ProgressTimeOut))
+            .TakeUntil(tileDisabledObservable)
+            .Subscribe(x =&gt;
+            {
+                counter++;
+
+                UpdateProgress(counter);
+                if (counter == Globals.ProgressSegments - 1)
+                {
+                    spotTileViewModel.IsEnabled = false;
+                    this.disposables.Dispose();
+                }
+            }));
+    }
+
+
+    private void UpdateProgress(int counter)
+    {
+        var timeRemaining = (Globals.TotalTimeoutInSeconds -
+                                (Globals.ProgressTimeOut * (counter + 1)));
+
+        spotTileViewModel.TimeOutRemaining = string.Format("{0}s of {1}s",
+            counter == 0 ? Globals.TotalTimeoutInSeconds : timeRemaining, 
+            Globals.TotalTimeoutInSeconds);
+
+            //100/60 * 30 = 50% done
+        var secPerSegment = Globals.TotalTimeoutInSeconds/Globals.ProgressSegments;
+        spotTileViewModel.Progress = 
+		(100/Globals.TotalTimeoutInSeconds) * (secPerSegment * counter+1);
+    }
+}</pre>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<h1><a name="That's-It" id="That's-It">That's It</a></h1>
+<p>Anyway that is all I wanted to say this time. I do have another VERY LARGE 
+article I am working on right now on CQRS, that I hope to have out soon. That 
+will take a me a while to finish so until then, could I just ask if you liked 
+this article could you spare 2 minutes to leave a comment/question, or a vote, 
+they are always welcome.</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>

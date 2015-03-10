@@ -43,7 +43,7 @@ namespace WpfBehaviours.Modules.Dealing.ViewModels
         private bool IsValid()
         {
             return !string.IsNullOrEmpty(this.FakeSpotPair) &&
-                   RateViewModel.WholeRate > 0;
+                    RateViewModel.WholeRate > 0;
         }
 
         public bool IsNavigationTarget(NavigationContext navigationContext)

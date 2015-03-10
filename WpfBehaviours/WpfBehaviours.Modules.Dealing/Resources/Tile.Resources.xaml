@@ -84,7 +84,7 @@
 
                 <Grid HorizontalAlignment="Stretch" Background="{DynamicResource AccentBrush}">
                     <Label Foreground="White" Content="Spot Tile" VerticalAlignment="Center"
-                           VerticalContentAlignment="Center" Margin="2,0,0,0"  />
+                            VerticalContentAlignment="Center" Margin="2,0,0,0"  />
                     <Button Style="{DynamicResource toolbarButtonStyle}"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center" VerticalContentAlignment="Center" Margin="0,0,0,0"
@@ -128,12 +128,12 @@
                                     ConverterParameter='True'}">
 
                         <ProgressBar Value="{Binding Progress}" 
-                                     Style="{StaticResource SegmentedProgressBarStyle}" 
-                                     Margin="5" Width="40" Height="40"></ProgressBar>
+                                        Style="{StaticResource SegmentedProgressBarStyle}" 
+                                        Margin="5" Width="40" Height="40"></ProgressBar>
 
 
                         <Label Content="{Binding TimeOutRemaining}" IsEnabled="{Binding IsEnabled}"
-                               VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="2"/>
+                                VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="2"/>
                     </StackPanel>
 
                 </Grid>
